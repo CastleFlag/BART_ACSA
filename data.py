@@ -1,4 +1,3 @@
-from lib2to3.pgen2.tokenize import tokenize
 import tokenizers
 from transformers import AutoTokenizer, BartTokenizer
 import torch

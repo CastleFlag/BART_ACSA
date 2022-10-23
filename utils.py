@@ -36,8 +36,11 @@ def ACDACD_template(major_category, minor_category):
     return major_category+ '의 '+ minor_category + ' 항목이다.'
 def ASCA_template(minor_category, polarity):
     return minor_category + '에 대해 ' + polarity_en_to_ko(polarity) + '이다.'
-def ACD_template(minor_category):
-    return minor_category + '에 대한 평가이다.'
+def ACD_template(minor_category, positive):
+    if positive:
+        return minor_category + '에 대한 평가이다.'
+    else:
+        return minor_category + '에 대한 평가가 아니다.'
 def reverse_ACD(sentence):
     return sentence.split()[0][:-1]
 def reverse_ACDACD(sentence):
@@ -57,8 +60,8 @@ def make_json(src_path, target_path, task, valid=False):
             major, minor = entity.split('#')
             major = simple_major(major)
             polarity = annotation[2]
-            if task == 'ACDACD':
-                processed_sentence = ACDACD_template(major, minor)
+            if task == 'ACD':
+                processed_sentence = ACD_template(minor)
                 if valid:
                     write_buffer.append(sentence + '.' + '\001' + minor)
                 else:
