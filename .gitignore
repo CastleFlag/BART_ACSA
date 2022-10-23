@@ -1,0 +1,11 @@
+#cache
+__pycache__/
+*.py[cod]
+
+#models
+*.pt
+
+data/*
+legacy/*
+#models
+*.pt
