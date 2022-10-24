@@ -58,8 +58,9 @@ def train(opt, device):
     tokenizer = AutoTokenizer.from_pretrained(opt.base_model)
     tokenizer.add_special_tokens(special_tokens_dict)
 
-    train_dataloader = create_dataloader(opt.train_data, tokenizer, opt)
-    dev_dataloader = create_dataloader(opt.dev_data, tokenizer, opt)
+    train_dataloader, dev_dataloader = create_dataloader(opt.train_data, tokenizer, opt, big=True)
+    # train_dataloader = create_dataloader(opt.train_data, tokenizer, opt)
+    # dev_dataloader = create_dataloader(opt.dev_data, tokenizer, opt)
 
     print('loading model')
     model = BartForSequenceClassification.from_pretrained(opt.base_model, num_labels=opt.num_labels)
@@ -72,11 +73,11 @@ def train(opt, device):
     epochs = opt.num_train_epochs
 
     total_steps = epochs * len(train_dataloader)
-    scheduler = get_linear_schedule_with_warmup(
-        optimizer,
-        num_warmup_steps=0,
-        num_training_steps=total_steps
-    )
+    # scheduler = get_linear_schedule_with_warmup(
+    #     optimizer,
+    #     num_warmup_steps=0,
+    #     num_training_steps=total_steps
+    # )
 
     for epoch in range(epochs):
         model.train()
@@ -92,7 +93,7 @@ def train(opt, device):
             total_loss += loss.item()
             # print('batch_loss: ', loss.item())
             optimizer.step()
-            scheduler.step()
+            # scheduler.step()
 
         avg_train_loss = total_loss / len(train_dataloader)
         print(f'{opt.train_target} Property_Epoch: {epoch+1}')
@@ -115,7 +116,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument( "--train_target", type=str, default="Entity", help="train entity or polarity")
     # parser.add_argument( "--train_data", type=str, default="data/acd_sample.jsonl", help="train file")
-    parser.add_argument( "--train_data", type=str, default="data/ACSA_train.jsonl", help="train file")
+    parser.add_argument( "--train_data", type=str, default="data/ACSA_big.jsonl", help="train file")
     # parser.add_argument( "--train_data", type=str, default="data/acd_big.jsonl", help="train file")
     # parser.add_argument( "--test_data", type=str, default="../data/nikluge-sa-2022-test.jsonl", help="test file")
     parser.add_argument( "--dev_data", type=str, default="data/ACSA_dev.jsonl", help="dev file")

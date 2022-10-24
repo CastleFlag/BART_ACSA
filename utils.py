@@ -67,8 +67,8 @@ def make_json(src_path, target_path, task, valid=False):
             f.write(line+'\n')
 
 if __name__ == '__main__':
-    sources = ['data/sample.jsonl', 'data/nikluge-sa-2022-train.jsonl', 'data/nikluge-sa-2022-dev.jsonl','data/nikluge-sa-2022-test.jsonl']
-    targets = ['sample', 'train', 'dev', 'test']
+    sources = ['data/sample.jsonl', 'data/nikluge-sa-2022-train.jsonl', 'data/nikluge-sa-2022-dev.jsonl','data/nikluge-sa-2022-test.jsonl', 'data/big_train.jsonl']
+    targets = ['sample', 'train', 'dev', 'test', 'big']
     task = 'ACSA'
     for src, trg in zip(sources, targets):
         path = f'data/{task}_{trg}.jsonl'

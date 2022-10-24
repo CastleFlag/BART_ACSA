@@ -7,8 +7,9 @@ from utils import jsonlload
 from torch.utils.data import DataLoader, Dataset, TensorDataset
 from tqdm import tqdm
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
-def create_dataloader(path, tokenizer, opt):
+def create_dataloader(path, tokenizer, opt, big=False):
     data = []
     with open(path, "r", encoding='utf8') as f:
         file = f.readlines()
@@ -19,9 +20,15 @@ def create_dataloader(path, tokenizer, opt):
             x, y, gold = line.split("\001")[0], line.strip().split("\001")[1], 0
         data.append([x, y, gold])
     df = pd.DataFrame(data, columns=["input_text", "target_text", "label"])
-    print(df)
-    train_dataset = BartDataset(df, tokenizer, opt)
-    return DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=0)
+    if not big:
+        train_dataset = BartDataset(df, tokenizer, opt)
+        return DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=0)
+    if big:
+        train_df, test_df = train_test_split(df, test_size=0.2)
+        train_ds = BartDataset(train_df, tokenizer, opt)
+        test_ds = BartDataset(test_df, tokenizer, opt)
+        return DataLoader(train_ds, batch_size=opt.batch_size, shuffle=True, num_workers=0), DataLoader(test_ds, batch_size=opt.batch_size, shuffle=True, num_workers=0)
+
 
 minor_id_to_name = ['일반', '디자인', '가격', '품질', '인지도', '편의성', '다양성']
 minor_name_to_id = { minor_id_to_name[i]: i for i in range(len(minor_id_to_name)) }
