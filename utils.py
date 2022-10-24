@@ -36,7 +36,7 @@ def ACDACD_template(major_category, minor_category):
     return major_category+ '의 '+ minor_category + ' 항목이다.'
 def ASCA_template(minor_category, polarity):
     return minor_category + '에 대해 ' + polarity_en_to_ko(polarity) + '이다.'
-def ACD_template(minor_category, positive):
+def ACD_template(minor_category, positive=True):
     if positive:
         return minor_category + '에 대한 평가이다.'
     else:
@@ -73,13 +73,13 @@ def make_json(src_path, target_path, task, valid=False):
 
 if __name__ == '__main__':
     datas = [
-        ('data/sample.jsonl', 'data/acd_sample.jsonl', 'ACDACD'),
-        ('data/big_train.jsonl', 'data/acd_big.jsonl', 'ACDACD'),
-        ('data/nikluge-sa-2022-train.jsonl', 'data/acd_train.jsonl', 'ACDACD')]
+        ('data/sample.jsonl', './data/acd_sample.jsonl', 'ACD'),
+        # ('data/big_train.jsonl', 'data/acd_big.jsonl', 'ACDACD'),
+        ('data/nikluge-sa-2022-train.jsonl', 'data/acd_train.jsonl', 'ACD')]
         # ('data/nikluge-sa-2022-test.jsonl', 'data/acd_test.jsonl', 'ACDACD')]
 
     for data in datas:
         src, trg, method = data
         make_json(src, trg, method)
-    make_json('data/nikluge-sa-2022-dev.jsonl', 'data/acd_dev.jsonl', 'ACDACD', True)
-    make_json('data/sample.jsonl', 'data/acd_dev_sample.jsonl', 'ACDACD', True)
+    make_json('data/nikluge-sa-2022-dev.jsonl', 'data/acd_dev.jsonl', 'ACD')
+    make_json('data/sample.jsonl', 'data/acd_dev_sample.jsonl', 'ACD')
