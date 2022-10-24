@@ -61,11 +61,7 @@ def make_json(src_path, target_path, task, valid=False):
             major = simple_major(major)
             polarity = annotation[2]
             if task == 'ACD':
-                processed_sentence = ACD_template(minor)
-                if valid:
-                    write_buffer.append(sentence + '.' + '\001' + minor)
-                else:
-                    write_buffer.append(sentence + '.' + '\001' + processed_sentence )
+                write_buffer.append(sentence + '\001' + major + '\001' + minor)
 
     with open(target_path, 'w', encoding='utf8') as f:
         for line in write_buffer:

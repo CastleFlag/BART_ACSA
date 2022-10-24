@@ -13,7 +13,8 @@
 # generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 # print(generated_text)
 import argparse
-from transformers import AutoModel, AutoTokenizer
+from re import L
+from transformers import AutoModel, AutoTokenizer, BartForSequenceClassification
 from transformers import AdamW
 from transformers import get_linear_schedule_with_warmup
 from data import *
@@ -27,20 +28,18 @@ from sklearn.model_selection import train_test_split
 special_tokens_dict = {
 'additional_special_tokens': ['&name&', '&affiliation&', '&social-security-num&', '&tel-num&', '&card-num&', '&bank-account&', '&num&', '&online-account&']
 }
-def get_inputs_dict(batch, tokenizer, device, test=False):
+def get_inputs_dict(batch, tokenizer, device):
     pad_token_id = tokenizer.pad_token_id
     # pad_token_id =1 
-    source_ids, source_mask, y = batch["source_ids"], batch["source_mask"], batch["target_ids"]
-    y_ids = y[:, :-1].contiguous()
-    lm_labels = y[:, 1:].clone()
-    if not test:
-        lm_labels[y[:, 1:] == pad_token_id] = -100
+    source_ids, source_mask, y, label = batch["source_ids"], batch["source_mask"], batch["target_ids"], batch['labels']
+    # y_ids = y[:, :-1].contiguous()
 
     inputs = {
         "input_ids": source_ids.to(device),
         "attention_mask": source_mask.to(device),
-        "decoder_input_ids": y_ids.to(device),
-        "labels": lm_labels.to(device),
+        # "decoder_input_ids": y_ids.to(device),
+        "decoder_input_ids": y.to(device),
+        "labels": label.to(device),
     }
     return inputs
 
@@ -63,7 +62,8 @@ def train(opt, device):
     dev_dataloader = create_dataloader(opt.dev_data, tokenizer, opt)
 
     print('loading model')
-    model = BartForConditionalGeneration.from_pretrained(opt.base_model)
+    model = BartForSequenceClassification.from_pretrained(opt.base_model, num_labels=opt.num_labels, names=['일반', '디자인', '가격', '품질', '인지도', '편의성', '다양성'])
+    # model = BartForSequenceClassification.from_pretrained("valhalla/bart-large-sst2", problem_type="multi_label_classification")
     model.resize_token_embeddings(len(tokenizer))
     model.to(device)
     print('end loading')
@@ -95,13 +95,14 @@ def train(opt, device):
         label_list = []
         if opt.do_eval:
             for batch in dev_dataloader:
-                inputs = get_inputs_dict(batch, tokenizer, device, test=True)
+                inputs = get_inputs_dict(batch, tokenizer, device)
                 with torch.no_grad():
-                    logits = model.generate(inputs['input_ids'])
-                    y_true = tokenizer.batch_decode(inputs['labels'],skip_special_tokens=True, clean_up_tokenization_spaces=True)
-                    y_pred = tokenizer.batch_decode(logits ,skip_special_tokens=True, clean_up_tokenization_spaces=True, num_beams=3)
-                pred_list.extend(y_pred)
-                label_list.extend(y_true)
+                    logits = model(**inputs).logits
+                print(logits)
+                predicted_class_id = logits.argmax(dim=1)
+                print(inputs['labels'])
+                pred_list.extend(predicted_class_id)
+                label_list.extend(inputs['labels'])
             f1score = evaluation(label_list, pred_list)
 
 if __name__ == '__main__':
@@ -118,9 +119,9 @@ if __name__ == '__main__':
     parser.add_argument( "--eps", type=float, default=1e-8)
     parser.add_argument( "--do_eval", type=bool, default=True)
     parser.add_argument( "--num_train_epochs", type=int, default=10)
-    parser.add_argument( "--base_model", type=str, default="gogamza/kobart-summarization")
-    # parser.add_argument( "--base_model", type=str, default="hyunwoongko/kobart")
-    parser.add_argument( "--num_labels", type=int, default=25)
+    # parser.add_argument( "--base_model", type=str, default="gogamza/kobart-summarization")
+    parser.add_argument( "--base_model", type=str, default="hyunwoongko/kobart")
+    parser.add_argument( "--num_labels", type=int, default=7)
     parser.add_argument( "--entity_model_path", type=str, default="./saved_models/entity_model/")
     parser.add_argument( "--polarity_model_path", type=str, default="./saved_models/polarity_model/")
     parser.add_argument( "--output_dir", type=str, default="../output/")
