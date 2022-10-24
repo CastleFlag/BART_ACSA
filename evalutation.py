@@ -2,13 +2,14 @@ from utils import *
 from transformers import AutoModel, AutoTokenizer
 import torch
 import numpy as np
+from sklearn.metrics import f1_score
+
 def evaluation(y_true, y_pred):
     hit = 0
     total = 0
     for gold, pred in zip(y_true, y_pred):
         total += 1
-        pred = reverse_ACDACD(pred)
-        print(f'g {gold} p {pred}')
+        # print(f'g {gold} p {pred}')
         if gold == pred:
             hit += 1
     print(f'hit {hit} total {total}')
@@ -17,11 +18,11 @@ def evaluation(y_true, y_pred):
     # y_true = list(map(int, y_true))
     # y_pred = list(map(int, y_pred))
     
-    # f1 = f1_score(y_true, y_pred, average='macro')
-    # # print('f1_score: ', f1_score(y_true, y_pred, average=None))
-    # print('f1_score_micro: ', f1_score(y_true, y_pred, average='micro'))
-    # print('f1_score_macro: ', f1_score(y_true, y_pred, average='macro'))
-    # return f1
+    f1 = f1_score(y_true, y_pred, average='macro')
+    # print('f1_score: ', f1_score(y_true, y_pred, average=None))
+    print('f1_score_micro: ', f1_score(y_true, y_pred, average='micro'))
+    print('f1_score_macro: ', f1_score(y_true, y_pred, average='macro'))
+    return f1
 def evaluation_f1(true_data, pred_data):
 
     true_data_list = true_data

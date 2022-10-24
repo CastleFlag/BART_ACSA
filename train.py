@@ -62,7 +62,7 @@ def train(opt, device):
     dev_dataloader = create_dataloader(opt.dev_data, tokenizer, opt)
 
     print('loading model')
-    model = BartForSequenceClassification.from_pretrained(opt.base_model, num_labels=opt.num_labels, names=['일반', '디자인', '가격', '품질', '인지도', '편의성', '다양성'])
+    model = BartForSequenceClassification.from_pretrained(opt.base_model, num_labels=opt.num_labels)
     # model = BartForSequenceClassification.from_pretrained("valhalla/bart-large-sst2", problem_type="multi_label_classification")
     model.resize_token_embeddings(len(tokenizer))
     model.to(device)
@@ -71,11 +71,19 @@ def train(opt, device):
     optimizer = AdamW(model.parameters(), lr=opt.learning_rate, eps=opt.eps)
     epochs = opt.num_train_epochs
 
+    total_steps = epochs * len(train_dataloader)
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=0,
+        num_training_steps=total_steps
+    )
+
     for epoch in range(epochs):
         model.train()
         total_loss = 0
         for step, batch in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
             inputs = get_inputs_dict(batch, tokenizer, device)
+            model.zero_grad()
             outputs = model(**inputs)
             # model outputs are always tuple in pytorch-transformers (see doc)
             loss = outputs[0]
@@ -84,7 +92,7 @@ def train(opt, device):
             total_loss += loss.item()
             # print('batch_loss: ', loss.item())
             optimizer.step()
-            model.zero_grad()
+            scheduler.step()
 
         avg_train_loss = total_loss / len(train_dataloader)
         print(f'{opt.train_target} Property_Epoch: {epoch+1}')
@@ -98,21 +106,19 @@ def train(opt, device):
                 inputs = get_inputs_dict(batch, tokenizer, device)
                 with torch.no_grad():
                     logits = model(**inputs).logits
-                print(logits)
                 predicted_class_id = logits.argmax(dim=1)
-                print(inputs['labels'])
-                pred_list.extend(predicted_class_id)
-                label_list.extend(inputs['labels'])
+                pred_list.extend(predicted_class_id.cpu())
+                label_list.extend(inputs['labels'].cpu())
             f1score = evaluation(label_list, pred_list)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument( "--train_target", type=str, default="Entity", help="train entity or polarity")
     # parser.add_argument( "--train_data", type=str, default="data/acd_sample.jsonl", help="train file")
-    parser.add_argument( "--train_data", type=str, default="data/acd_train.jsonl", help="train file")
+    parser.add_argument( "--train_data", type=str, default="data/ACSA_train.jsonl", help="train file")
     # parser.add_argument( "--train_data", type=str, default="data/acd_big.jsonl", help="train file")
     # parser.add_argument( "--test_data", type=str, default="../data/nikluge-sa-2022-test.jsonl", help="test file")
-    parser.add_argument( "--dev_data", type=str, default="data/acd_dev.jsonl", help="dev file")
+    parser.add_argument( "--dev_data", type=str, default="data/ACSA_dev.jsonl", help="dev file")
     # parser.add_argument( "--dev_data", type=str, default="data/acd_dev_sample.jsonl", help="train file")
     parser.add_argument( "--batch_size", type=int, default=16) 
     parser.add_argument( "--learning_rate", type=float, default=1e-5) 
@@ -126,8 +132,7 @@ if __name__ == '__main__':
     parser.add_argument( "--polarity_model_path", type=str, default="./saved_models/polarity_model/")
     parser.add_argument( "--output_dir", type=str, default="../output/")
     parser.add_argument( "--max_len", type=int, default=256)
-    parser.add_argument( "--classifier_hidden_size", type=int, default=768)
-    parser.add_argument( "--classifier_dropout_prob", type=float, default=0.1, help="dropout in classifier")
+    parser.add_argument( "--istest", type=bool, default=False, help="train/dev or test(no label)")
     opt = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

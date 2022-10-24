@@ -6,12 +6,10 @@ def jsonload(fname, encoding="utf-8"):
     with open(fname, encoding=encoding) as f:
         j = json.load(f)
     return j
-
 # json 개체를 파일이름으로 깔끔하게 저장
 def jsondump(j, fname):
     with open(fname, "w", encoding="UTF8") as f:
         json.dump(j, f, ensure_ascii=False)
-
 # jsonl 파일 읽어서 list에 저장
 def jsonlload(fname, encoding="utf-8"):
     json_list = []
@@ -19,7 +17,6 @@ def jsonlload(fname, encoding="utf-8"):
         for line in f.readlines():
             json_list.append(json.loads(line))
     return json_list
-
 def simple_major(major):
     if major== '제품 전체':
         return '제품'
@@ -59,23 +56,21 @@ def make_json(src_path, target_path, task, valid=False):
             entity = annotation[0]
             major, minor = entity.split('#')
             major = simple_major(major)
-            polarity = annotation[2]
+            polarity = polarity_en_to_ko[annotation[2]]
             if task == 'ACD':
                 write_buffer.append(sentence + '\001' + major + '\001' + minor)
+            elif task == 'ACSA':
+                write_buffer.append(sentence + '\001' + minor + '\001' + polarity)
 
     with open(target_path, 'w', encoding='utf8') as f:
         for line in write_buffer:
             f.write(line+'\n')
 
 if __name__ == '__main__':
-    datas = [
-        ('data/sample.jsonl', './data/acd_sample.jsonl', 'ACD'),
-        # ('data/big_train.jsonl', 'data/acd_big.jsonl', 'ACDACD'),
-        ('data/nikluge-sa-2022-train.jsonl', 'data/acd_train.jsonl', 'ACD')]
-        # ('data/nikluge-sa-2022-test.jsonl', 'data/acd_test.jsonl', 'ACDACD')]
-
-    for data in datas:
-        src, trg, method = data
-        make_json(src, trg, method)
-    make_json('data/nikluge-sa-2022-dev.jsonl', 'data/acd_dev.jsonl', 'ACD')
-    make_json('data/sample.jsonl', 'data/acd_dev_sample.jsonl', 'ACD')
+    sources = ['data/sample.jsonl', 'data/nikluge-sa-2022-train.jsonl', 'data/nikluge-sa-2022-dev.jsonl','data/nikluge-sa-2022-test.jsonl']
+    targets = ['sample', 'train', 'dev', 'test']
+    task = 'ACSA'
+    for src, trg in zip(sources, targets):
+        path = f'data/{task}_{trg}.jsonl'
+        print(path)
+        make_json(src, path, task)

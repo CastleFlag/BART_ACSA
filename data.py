@@ -5,7 +5,6 @@ from torch import tensor
 import torch.nn.functional as F
 from utils import jsonlload
 from torch.utils.data import DataLoader, Dataset, TensorDataset
-from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import pandas as pd
 
@@ -14,9 +13,13 @@ def create_dataloader(path, tokenizer, opt):
     with open(path, "r", encoding='utf8') as f:
         file = f.readlines()
     for line in file:
-        x, y, gold = line.split("\001")[0], line.strip().split("\001")[1], line.strip().split("\001")[2]
+        if not opt.istest:
+            x, y, gold = line.split("\001")[0], line.strip().split("\001")[1], line.strip().split("\001")[2]
+        else:
+            x, y, gold = line.split("\001")[0], line.strip().split("\001")[1], 0
         data.append([x, y, gold])
     df = pd.DataFrame(data, columns=["input_text", "target_text", "label"])
+    print(df)
     train_dataset = BartDataset(df, tokenizer, opt)
     return DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=0)
 
@@ -26,6 +29,11 @@ polarity_en_to_ko ={
     'positive' : '긍정적',
     'negative' : '부정적',
     'neutral' : '중립적'
+}
+polarity_to_id ={
+    '긍정적':0,
+    '부정적':1,
+    '중립적':2
 }
 entity_property_pair= [   
         '제품 전체#일반', '제품 전체#디자인','제품 전체#가격','제품 전체#품질','제품 전체#인지도', '제품 전체#편의성','제품 전체#다양성',
@@ -37,7 +45,8 @@ class BartDataset(Dataset):
     def __init__(self, data, tokenizer, opt):
         self.tokenizer = tokenizer
         data = [
-            ('<s>'+input_text+'</s>', target_text+'</s>', minor_name_to_id[label], tokenizer, opt)
+            #TODO : fix polarity_to_id accoding to task
+            ('<s>'+input_text+'</s>', target_text+'</s>', polarity_to_id[label], tokenizer, opt)
             for input_text, target_text, label in zip(
                 data['input_text'], data['target_text'], data['label']
             )
