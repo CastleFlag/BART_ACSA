@@ -30,16 +30,16 @@ def test(opt, device):
     print('end loading')
 
     for bert_batch, bart_batch in zip(bert_dev_dataloader, bart_dev_dataloader):
-        inputs = get_inputs_dict(batch, tokenizer, device)
-        input_ids, input_mask, target_id, target_mask, label = batch["source_ids"], batch["source_mask"], batch["target_ids"], batch['target_mask'], batch['labels']
+        bert_inputs = get_inputs_dict(bert_batch, bert_tokenizer, device)
+        bart_inputs = get_inputs_dict(bart_batch, bart_tokenizer, device)
         
         with torch.no_grad():
-            _, ce4_logits = ce4_model(input_ids, input_mask)
+            _, ce4_logits = ce4_model(**bert_inputs)
         print(ce4_logits)
         major_prediction = major_id_to_name[torch.argmax(ce4_logits, dim = -1)]
         print(major_prediction)
         with torch.no_grad():
-            _, ce7_logits = ce7_model(input_ids, input_mask, major_prediction)
+            _, ce7_logits = ce7_model(bart_inputs['input_ids'], bart_inputs['attention_mask'], major_prediction)
         minor_prediction = minor_id_to_name[torch.argmax(ce7_logits, dim = -1)]
 
         with torch.no_grad():

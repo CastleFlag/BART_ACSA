@@ -81,9 +81,11 @@ def train(opt, device):
         print(f'Average train loss: {avg_train_loss}')
 
         # print(f'predict_val acc : {predict_val(opt.dev_data, model, tokenizer, device, opt)}')
-        pred_list = []
-        label_list = []
         if opt.do_eval:
+            model.eval()
+            pred_list = []
+            label_list = []
+            
             for batch in dev_dataloader:
                 inputs = get_inputs_dict(batch, tokenizer, device)
                 with torch.no_grad():
@@ -92,7 +94,7 @@ def train(opt, device):
                 pred_list.extend(predicted_class_id.cpu())
                 label_list.extend(inputs['labels'].cpu())
             f1score = evaluation(label_list, pred_list)
-        model_saved_path = entity_model_path + 'saved_model_epoch_' + str(epoch+1) + '.pt'
+        model_saved_path = entity_model_path + str(opt.num_labels) +'saved_model_epoch_' + str(epoch+1) + '.pt'
         torch.save(model.state_dict(), model_saved_path)
 
 if __name__ == '__main__':
@@ -102,14 +104,14 @@ if __name__ == '__main__':
     # parser.add_argument( "--test_data", type=str, default="../data/nikluge-sa-2022-test.jsonl", help="test file")
     parser.add_argument( "--dev_data", type=str, default="data/ACSA_dev.jsonl", help="dev file")
     # parser.add_argument( "--dev_data", type=str, default="data/acd_dev_sample.jsonl", help="train file")
-    parser.add_argument( "--batch_size", type=int, default=8) 
+    parser.add_argument( "--batch_size", type=int, default=16) 
     parser.add_argument( "--learning_rate", type=float, default=1e-5) 
     parser.add_argument( "--eps", type=float, default=1e-8)
     parser.add_argument( "--do_eval", type=bool, default=True)
     parser.add_argument( "--num_train_epochs", type=int, default=20)
     # parser.add_argument( "--base_model", type=str, default="gogamza/kobart-summarization")
     parser.add_argument( "--base_model", type=str, default="digit82/kobart-summarization")
-    parser.add_argument( "--num_labels", type=int, default=7)
+    parser.add_argument( "--num_labels", type=int, default=3)
     parser.add_argument( "--entity_model_path", type=str, default="./saved_models/entity_model/")
     parser.add_argument( "--polarity_model_path", type=str, default="./saved_models/polarity_model/")
     parser.add_argument( "--output_dir", type=str, default="../output/")
