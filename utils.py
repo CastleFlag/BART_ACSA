@@ -23,6 +23,8 @@ def simple_major(major):
     elif major== '패키지/구성품':
         return '패키지'
     return major 
+def clean_text(text):
+    return re.compile('[^ 0-9A-Za-z가-힣]').sub('',text).strip()
 
 polarity_en_to_ko ={
     'positive' : '긍정적',
@@ -50,7 +52,7 @@ def make_json(src_path, target_path, task, valid=False):
     write_buffer = []
     for utterance in raw_data:
         sentence = utterance['sentence_form']
-        sentence = re.compile('[^ 0-9A-Za-z가-힣]').sub('',sentence).strip()
+        sentence = clean_text(sentence)
         annotations = utterance['annotation']
         for annotation in annotations:
             entity = annotation[0]

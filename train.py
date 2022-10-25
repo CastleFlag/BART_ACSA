@@ -13,7 +13,6 @@
 # generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 # print(generated_text)
 import argparse
-from re import L
 from transformers import AutoModel, AutoTokenizer, BartForSequenceClassification
 from transformers import AdamW
 from transformers import get_linear_schedule_with_warmup
@@ -28,29 +27,11 @@ from sklearn.model_selection import train_test_split
 special_tokens_dict = {
 'additional_special_tokens': ['&name&', '&affiliation&', '&social-security-num&', '&tel-num&', '&card-num&', '&bank-account&', '&num&', '&online-account&']
 }
-def get_inputs_dict(batch, tokenizer, device):
-    pad_token_id = tokenizer.pad_token_id
-    # pad_token_id =1 
-    source_ids, source_mask, y, label = batch["source_ids"], batch["source_mask"], batch["target_ids"], batch['labels']
-    # y_ids = y[:, :-1].contiguous()
-
-    inputs = {
-        "input_ids": source_ids.to(device),
-        "attention_mask": source_mask.to(device),
-        # "decoder_input_ids": y_ids.to(device),
-        "decoder_input_ids": y.to(device),
-        "labels": label.to(device),
-    }
-    return inputs
-
 def train(opt, device):
-    entity_model_path = opt.entity_model_path + opt.base_model + '/' + str(opt.num_labels) + '/'
-    polarity_model_path = opt.polarity_model_path + opt.base_model + '/'
+    entity_model_path = opt.entity_model_path +  str(opt.num_labels) + '/'
     best_model_path = '../saved_model/best_model/'
     if not os.path.exists(entity_model_path):
         os.makedirs(entity_model_path)
-    if not os.path.exists(polarity_model_path):
-        os.makedirs(polarity_model_path)
     if not os.path.exists(best_model_path):
         os.makedirs(best_model_path)
 
@@ -58,9 +39,9 @@ def train(opt, device):
     tokenizer = AutoTokenizer.from_pretrained(opt.base_model)
     tokenizer.add_special_tokens(special_tokens_dict)
 
-    train_dataloader, dev_dataloader = create_dataloader(opt.train_data, tokenizer, opt, big=True)
-    # train_dataloader = create_dataloader(opt.train_data, tokenizer, opt)
-    # dev_dataloader = create_dataloader(opt.dev_data, tokenizer, opt)
+    # train_dataloader, dev_dataloader = create_dataloader(opt.train_data, tokenizer, opt, big=True)
+    train_dataloader = create_dataloader(opt.train_data, tokenizer, opt)
+    dev_dataloader = create_dataloader(opt.dev_data, tokenizer, opt)
 
     print('loading model')
     model = BartForSequenceClassification.from_pretrained(opt.base_model, num_labels=opt.num_labels)
@@ -111,23 +92,23 @@ def train(opt, device):
                 pred_list.extend(predicted_class_id.cpu())
                 label_list.extend(inputs['labels'].cpu())
             f1score = evaluation(label_list, pred_list)
+        model_saved_path = entity_model_path + 'saved_model_epoch_' + str(epoch+1) + '.pt'
+        torch.save(model.state_dict(), model_saved_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument( "--train_target", type=str, default="Entity", help="train entity or polarity")
-    # parser.add_argument( "--train_data", type=str, default="data/acd_sample.jsonl", help="train file")
-    parser.add_argument( "--train_data", type=str, default="data/ACSA_big.jsonl", help="train file")
-    # parser.add_argument( "--train_data", type=str, default="data/acd_big.jsonl", help="train file")
+    parser.add_argument( "--train_data", type=str, default="data/ACSA_train.jsonl", help="train file")
     # parser.add_argument( "--test_data", type=str, default="../data/nikluge-sa-2022-test.jsonl", help="test file")
     parser.add_argument( "--dev_data", type=str, default="data/ACSA_dev.jsonl", help="dev file")
     # parser.add_argument( "--dev_data", type=str, default="data/acd_dev_sample.jsonl", help="train file")
-    parser.add_argument( "--batch_size", type=int, default=16) 
+    parser.add_argument( "--batch_size", type=int, default=8) 
     parser.add_argument( "--learning_rate", type=float, default=1e-5) 
     parser.add_argument( "--eps", type=float, default=1e-8)
     parser.add_argument( "--do_eval", type=bool, default=True)
-    parser.add_argument( "--num_train_epochs", type=int, default=10)
+    parser.add_argument( "--num_train_epochs", type=int, default=20)
     # parser.add_argument( "--base_model", type=str, default="gogamza/kobart-summarization")
-    parser.add_argument( "--base_model", type=str, default="hyunwoongko/kobart")
+    parser.add_argument( "--base_model", type=str, default="digit82/kobart-summarization")
     parser.add_argument( "--num_labels", type=int, default=7)
     parser.add_argument( "--entity_model_path", type=str, default="./saved_models/entity_model/")
     parser.add_argument( "--polarity_model_path", type=str, default="./saved_models/polarity_model/")
