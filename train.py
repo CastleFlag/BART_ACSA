@@ -65,6 +65,7 @@ def train(opt, device):
         total_loss = 0
         for step, batch in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
             inputs = get_inputs_dict(batch, tokenizer, device)
+            print(inputs)
             model.zero_grad()
             outputs = model(**inputs)
             # model outputs are always tuple in pytorch-transformers (see doc)

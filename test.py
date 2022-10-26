@@ -1,6 +1,6 @@
 import argparse
 import torch
-from transformers import AutoModel, AutoTokenizer, BartForSequenceClassification
+from transformers import AutoModel, AutoTokenizer, BartForSequenceClassification, BertForSequenceClassification 
 from data import *
 from utils import clean_text
 special_tokens_dict = {
@@ -9,12 +9,13 @@ special_tokens_dict = {
 
 def test(opt, device):
 
-    print(opt.base_model)
+    print(opt.bert_base_model)
+    print(opt.bart_base_model)
     bert_tokenizer = AutoTokenizer.from_pretrained(opt.bert_base_model)
     bart_tokenizer = AutoTokenizer.from_pretrained(opt.bart_base_model)
     bert_tokenizer.add_special_tokens(special_tokens_dict)
     bart_tokenizer.add_special_tokens(special_tokens_dict)
-    bert_dev_dataloader = create_dataloader(opt.dev_data, bert_tokenizer, opt)
+    bert_dev_dataloader = create_bert_dataloader(opt.dev_data, bert_tokenizer, opt, 'ACD')
     bart_dev_dataloader = create_dataloader(opt.dev_data, bart_tokenizer, opt)
 
     print('loading model')
@@ -43,9 +44,9 @@ def test(opt, device):
         minor_prediction = minor_id_to_name[torch.argmax(ce7_logits, dim = -1)]
 
         with torch.no_grad():
-            _, pc_logits = pc_model(input_ids, input_mask, target_id)
-        pc_prediction = polarity_id_to_name[torch.argmax(ce7_logits, dim = -1)]
-        print(inputs)
+            _, pc_logits = pc_model(bart_inputs['input_ids'], bart_inputs['input_mask'], minor_prediction)
+        pc_prediction = polarity_id_to_name[torch.argmax(pc_logits, dim = -1)]
+        print(pc_prediction)
         # with torch.no_grad():
         #     _, ce4_logits = ce4_model(input_ids, attention_mask)
 
@@ -55,20 +56,37 @@ def test(opt, device):
     # jsondump(pred_data, opt.output_dir + opt.base_model +'_'+ current_day + '.json')
     # print(opt.output_dir + opt.base_model +'_'+ current_day + '.json')
 
-def load_models(opt):
-    model4 = BartForSequenceClassification.from_pretrained(opt.bert_base_model, num_labels=4)
-    model4.load_state_dict(torch.load(opt.entity4_model_path, map_location=device))
-
+def load_models(opt, bert_tokenizer_len, bart_tokenizer_len):
+    model4 = BertForSequenceClassification.from_pretrained(opt.bert_base_model, num_labels=4)
     model7 = BartForSequenceClassification.from_pretrained(opt.bart_base_model, num_labels=7)
-    model7.load_state_dict(torch.load(opt.entity7_model_path, map_location=device))
-
     pola_model = BartForSequenceClassification.from_pretrained(opt.bart_base_model, num_labels=3)
+    model4.resize_token_embeddings(bert_tokenizer_len)
+    model7.resize_token_embeddings(bart_tokenizer_len)
+    pola_model.resize_token_embeddings(bart_tokenizer_len)
+    model4.load_state_dict(torch.load(opt.entity4_model_path, map_location=device))
+    model7.load_state_dict(torch.load(opt.entity7_model_path, map_location=device))
     pola_model.load_state_dict(torch.load(opt.polarity_model_path, map_location=device))
 
     return model4, model7, pola_model
 
-def inference(tokenizer, ce4_model, ce7_model, pc_model, data):
+def inference(opt, device):
+    print(opt.bert_base_model)
+    print(opt.bart_base_model)
+    bert_tokenizer = AutoTokenizer.from_pretrained(opt.bert_base_model)
+    bart_tokenizer = AutoTokenizer.from_pretrained(opt.bart_base_model)
+    bert_tokenizer.add_special_tokens(special_tokens_dict)
+    bart_tokenizer.add_special_tokens(special_tokens_dict)
+    print('loading model')
+    ce4_model, ce7_model, pc_model = load_models(opt,len(bert_tokenizer), len(bart_tokenizer))
+    ce4_model.to(device)
+    ce7_model.eval()
+    ce7_model.to(device)
+    pc_model.to(device)
+    pc_model.eval()
+    print('end loading')
     count = 0
+
+    data = jsonlload(opt.dev_data)
     for line in data:
         sentence = line['sentence_form']
         # sentence['annotation'] = []
@@ -78,35 +96,41 @@ def inference(tokenizer, ce4_model, ce7_model, pc_model, data):
         #     continue
         sentence = clean_text(sentence)
 
-        tokenized_data = tokenizer(sentence, padding='max_length', max_length=256, truncation=True)
-        input_ids = torch.tensor([tokenized_data['input_ids']]).to(device)
-        attention_mask = torch.tensor([tokenized_data['attention_mask']]).to(device)
+        bert_tokenized_data = bert_tokenizer(['<CLS>'+sentence+'<SEP>'], padding='max_length', max_length=256, truncation=True)
+        bert_input_ids = torch.tensor(bert_tokenized_data['input_ids']).to(device)
+        bert_attention_mask = torch.tensor([bert_tokenized_data['attention_mask']]).to(device)
+
+        bart_tokenized_data = bart_tokenizer(['<s>'+sentence+'</s>'], padding='max_length', max_length=256, truncation=True, return_tensors='pt')
+        bart_input_ids = bart_tokenized_data['input_ids'].to(device)
+        bart_attention_mask = bart_tokenized_data['attention_mask'].to(device)
+
         with torch.no_grad():
-            _, ce4_logits = ce4_model(input_ids, attention_mask)
+            ce4_logits = ce4_model(bert_input_ids, bert_attention_mask).logits
         major_prediction = major_id_to_name[torch.argmax(ce4_logits, dim = -1)]
+        tokenized_major = bart_tokenizer([major_prediction+'</s>'], padding='max_length', max_length=256, truncation=True, return_tensors='pt')
+        tokenized_major_id = tokenized_major['input_ids'].to(device)
+        # tokenized_major_mask = tokenized_major['attention_mask'].to(device)
 
-        tokenized_major = tokenizer(major_prediction, padding='max_length', max_length=256, truncation=True)
-        major_target_ids = torch.tensor([tokenized_major['input_ids']]).to(device)
-        major_target_mask = torch.tensor([tokenized_major['attention_mask']]).to(device)
         with torch.no_grad():
-            _, ce7_logits = ce7_model(input_ids, attention_mask, major_target_ids)
+            ce7_logits = ce7_model(bart_input_ids, bart_attention_mask, tokenized_major_id).logits
+        tokenized_major = bart_tokenizer([major_prediction+'</s>'], padding='max_length', max_length=256, truncation=True, return_tensors='pt')
         minor_prediction = minor_id_to_name[torch.argmax(ce7_logits, dim = -1)]
+        tokenized_minor = bart_tokenizer([minor_prediction+'</s>'], padding='max_length', max_length=256, truncation=True, return_tensors='pt')
+        tokenized_minor_id = tokenized_minor['input_ids'].to(device)
 
-        tokenized_minor = tokenizer(minor_prediction, padding='max_length', max_length=256, truncation=True)
-        minor_target_ids = torch.tensor([tokenized_minor['input_ids']]).to(device)
-        minor_target_mask = torch.tensor([tokenized_minor['attention_mask']]).to(device)
         with torch.no_grad():
-            _, pc_logits = pc_model(input_ids, attention_mask, minor_target_ids)
-        pc_prediction = polarity_id_to_name[torch.argmax(ce7_logits, dim = -1)]
-        print()
+            pc_logits = pc_model(bart_input_ids, bart_attention_mask, tokenized_minor_id).logits
+        pc_prediction = polarity_id_to_name[torch.argmax(pc_logits, dim = -1)]
+        print(f'4{major_prediction} 7{minor_prediction} pc{pc_prediction}')
         # sentence['annotation'].append([ce4_result+ce7_result, pc_result])
     return data
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument( "--dev_data", type=str, default="data/acd_dev.jsonl", help="dev file")
+    parser.add_argument( "--dev_data", type=str, default="data/nikluge-sa-2022-dev.jsonl", help="dev file")
     parser.add_argument( "--batch_size", type=int, default=8) 
-    parser.add_argument( "--bert_base_model", type=str, default="bert-base-multilingual-uncased")
+    # parser.add_argument( "--bert_base_model", type=str, default="bert-base-multilingual-uncased")
+    parser.add_argument( "--bert_base_model", type=str, default="xlm-roberta-base")
     parser.add_argument( "--bart_base_model", type=str, default="digit82/kobart-summarization")
     # parser.add_argument( "--bart_base_model", type=str, default="hyunwoongko/kobart")
     parser.add_argument( "--entity4_model_path", type=str, default="./saved_models/model4.pt")
@@ -114,7 +138,8 @@ if __name__ == '__main__':
     parser.add_argument( "--polarity_model_path", type=str, default="./saved_models/pc_model.pt")
     parser.add_argument( "--output_dir", type=str, default="../output/")
     parser.add_argument( "--max_len", type=int, default=256)
+    parser.add_argument( "--istest", type=bool, default=True)
     opt = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    test(opt, device)
+    inference(opt, device)

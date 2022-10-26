@@ -1,9 +1,9 @@
-import tokenizers
+import re
 from transformers import AutoTokenizer, BartTokenizer
 import torch
 from torch import tensor
 import torch.nn.functional as F
-from utils import jsonlload
+from utils import jsonlload, simple_major
 from torch.utils.data import DataLoader, Dataset, TensorDataset
 from tqdm import tqdm
 import pandas as pd
@@ -29,8 +29,7 @@ def create_dataloader(path, tokenizer, opt, big=False):
         test_ds = BartDataset(test_df, tokenizer, opt)
         return DataLoader(train_ds, batch_size=opt.batch_size, shuffle=True, num_workers=0), DataLoader(test_ds, batch_size=opt.batch_size, shuffle=True, num_workers=0)
 
-
-major_id_to_name = ['전체', '패키지', '본품', '브랜드']
+major_id_to_name = ['제품', '패키지', '본품', '브랜드']
 major_name_to_id = { major_id_to_name[i]: i for i in range(len(major_id_to_name)) }
 minor_id_to_name = ['일반', '디자인', '가격', '품질', '인지도', '편의성', '다양성']
 minor_name_to_id = { minor_id_to_name[i]: i for i in range(len(minor_id_to_name)) }
@@ -61,16 +60,23 @@ def get_inputs_dict(batch, tokenizer, device):
     }
     return inputs
 class BartDataset(Dataset):
-    def __init__(self, data, tokenizer, opt):
+    def __init__(self, data, tokenizer, opt, task='ACSA'):
         self.tokenizer = tokenizer
-        data = [
-            #TODO : fix polarity_to_id accoding to task
-            # ('<s>'+input_text+'</s>', target_text+'</s>', minor_name_to_id[label], tokenizer, opt)
-            ('<s>'+input_text+'</s>', target_text+'</s>', polarity_to_id[label], tokenizer, opt)
-            for input_text, target_text, label in zip(
-                data['input_text'], data['target_text'], data['label']
-            )
-        ]
+        if task == 'ACD':
+            data = [
+                #TODO : fix polarity_to_id accoding to task
+                ('<s>'+input_text+'</s>', target_text+'</s>', minor_name_to_id[label], tokenizer, opt)
+                for input_text, target_text, label in zip(
+                    data['input_text'], data['target_text'], data['label']
+                )
+            ]
+        elif task == 'ACSA':
+            data = [
+                ('<s>'+input_text+'</s>', target_text+'</s>', polarity_to_id[label], tokenizer, opt)
+                for input_text, target_text, label in zip(
+                    data['input_text'], data['target_text'], data['label']
+                )
+            ]
         preprocess_fn = (
             self.preprocess_data_bart
         )
