@@ -124,33 +124,34 @@ def inference(opt, device):
             pc_logits = pc_model(bart_input_ids, bart_attention_mask, tokenized_minor_id, tokenized_minor_mask).logits
         pc_prediction = polarity_id_to_name[torch.argmax(pc_logits, dim = -1)]
 
-        annotation = line['annotation'][0]
-        entity = annotation[0]
-        major, minor = entity.split('#')
-        major = simple_major(major)
-        polarity = polarity_en_to_ko[annotation[2]]
+        # annotation = line['annotation'][0]
+        # entity = annotation[0]
+        # major, minor = entity.split('#')
+        # major = simple_major(major)
+        # polarity = polarity_en_to_ko[annotation[2]]
         # print(f'pred 4{major_prediction}=7{minor_prediction}=pc{pc_prediction}=')
         # print(f'gold 4{major}=7{minor}=pc{polarity}=')
-        if major==major_prediction:
-            majorhit += 1
-        if minor==minor_prediction:
-            minorhit += 1
-        if polarity==pc_prediction:
-            pchit += 1
-        if major == major_prediction and minor==minor_prediction and polarity==pc_prediction:
-            hit += 1
-        count +=1 
+        # if major==major_prediction:
+        #     majorhit += 1
+        # if minor==minor_prediction:
+        #     minorhit += 1
+        # if polarity==pc_prediction:
+        #     pchit += 1
+        # if major == major_prediction and minor==minor_prediction and polarity==pc_prediction:
+        #     hit += 1
+        # count +=1 
         # data.append([sentence, major_name_to_id[major]])
         
 
-        # sentence['annotation'].append([unsimple_major(major_prediction)+minor_prediction, pc_prediction])
-    print(f'accuracy : {hit/count} ma {majorhit/count} mi {minorhit/count} pc {pchit/count}')
-    # jsondump(data, 'output.json')
+        line['annotation'].append([unsimple_major(major_prediction)+'#'+minor_prediction, pc_prediction])
+    # print(f'accuracy : {hit/count} ma {majorhit/count} mi {minorhit/count} pc {pchit/count}')
+    jsondump(data, 'output.json')
     return data
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument( "--dev_data", type=str, default="data/nikluge-sa-2022-dev.jsonl", help="dev file")
+    # parser.add_argument( "--dev_data", type=str, default="data/nikluge-sa-2022-dev.jsonl", help="dev file")
+    parser.add_argument( "--dev_data", type=str, default="data/nikluge-sa-2022-test.jsonl", help="dev file")
     parser.add_argument( "--batch_size", type=int, default=8) 
     # parser.add_argument( "--bert_base_model", type=str, default="bert-base-multilingual-uncased")
     parser.add_argument( "--bert_base_model", type=str, default="xlm-roberta-base")
