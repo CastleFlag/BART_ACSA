@@ -2,7 +2,7 @@ import argparse
 import torch
 from transformers import AutoModel, AutoTokenizer, BartForSequenceClassification, BertForSequenceClassification 
 from data import *
-from utils import clean_text
+from utils import clean_text, unsimple_major, jsondump
 special_tokens_dict = {
     'additional_special_tokens': ['&name&', '&affiliation&', '&social-security-num&', '&tel-num&', '&card-num&', '&bank-account&', '&num&', '&online-account&']
     }
@@ -85,12 +85,14 @@ def inference(opt, device):
     pc_model.eval()
     print('end loading')
     count = 0
-
+    hit = 0
+    majorhit = 0
+    minorhit = 0
+    pchit = 0
     data = jsonlload(opt.dev_data)
     for line in data:
         sentence = line['sentence_form']
         # sentence['annotation'] = []
-        count += 1
         # if type(sentence) != str:
         #     print("form type is arong: ", sentence)
         #     continue
@@ -109,20 +111,41 @@ def inference(opt, device):
         major_prediction = major_id_to_name[torch.argmax(ce4_logits, dim = -1)]
         tokenized_major = bart_tokenizer([major_prediction+'</s>'], padding='max_length', max_length=256, truncation=True, return_tensors='pt')
         tokenized_major_id = tokenized_major['input_ids'].to(device)
-        # tokenized_major_mask = tokenized_major['attention_mask'].to(device)
+        tokenized_major_mask = tokenized_major['attention_mask'].to(device)
 
         with torch.no_grad():
-            ce7_logits = ce7_model(bart_input_ids, bart_attention_mask, tokenized_major_id).logits
-        tokenized_major = bart_tokenizer([major_prediction+'</s>'], padding='max_length', max_length=256, truncation=True, return_tensors='pt')
+            ce7_logits = ce7_model(bart_input_ids, bart_attention_mask, tokenized_major_id, tokenized_major_mask).logits
         minor_prediction = minor_id_to_name[torch.argmax(ce7_logits, dim = -1)]
         tokenized_minor = bart_tokenizer([minor_prediction+'</s>'], padding='max_length', max_length=256, truncation=True, return_tensors='pt')
         tokenized_minor_id = tokenized_minor['input_ids'].to(device)
+        tokenized_minor_mask = tokenized_minor['attention_mask'].to(device)
 
         with torch.no_grad():
-            pc_logits = pc_model(bart_input_ids, bart_attention_mask, tokenized_minor_id).logits
+            pc_logits = pc_model(bart_input_ids, bart_attention_mask, tokenized_minor_id, tokenized_minor_mask).logits
         pc_prediction = polarity_id_to_name[torch.argmax(pc_logits, dim = -1)]
-        print(f'4{major_prediction} 7{minor_prediction} pc{pc_prediction}')
-        # sentence['annotation'].append([ce4_result+ce7_result, pc_result])
+
+        annotation = line['annotation'][0]
+        entity = annotation[0]
+        major, minor = entity.split('#')
+        major = simple_major(major)
+        polarity = polarity_en_to_ko[annotation[2]]
+        # print(f'pred 4{major_prediction}=7{minor_prediction}=pc{pc_prediction}=')
+        # print(f'gold 4{major}=7{minor}=pc{polarity}=')
+        if major==major_prediction:
+            majorhit += 1
+        if minor==minor_prediction:
+            minorhit += 1
+        if polarity==pc_prediction:
+            pchit += 1
+        if major == major_prediction and minor==minor_prediction and polarity==pc_prediction:
+            hit += 1
+        count +=1 
+        # data.append([sentence, major_name_to_id[major]])
+        
+
+        # sentence['annotation'].append([unsimple_major(major_prediction)+minor_prediction, pc_prediction])
+    print(f'accuracy : {hit/count} ma {majorhit/count} mi {minorhit/count} pc {pchit/count}')
+    # jsondump(data, 'output.json')
     return data
 
 if __name__ == '__main__':

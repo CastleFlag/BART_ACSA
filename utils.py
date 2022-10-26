@@ -23,6 +23,12 @@ def simple_major(major):
     elif major== '패키지/구성품':
         return '패키지'
     return major 
+def unsimple_major(major):
+    if major== '제품':
+        return '제품 전체'
+    elif major== '패키지':
+        return '패키지/구성품'
+    return major
 def clean_text(text):
     return re.compile('[^ 0-9A-Za-z가-힣]').sub('',text).strip()
 
