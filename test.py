@@ -1,60 +1,8 @@
 import argparse
 import torch
 from transformers import AutoModel, AutoTokenizer, BartForSequenceClassification, BertForSequenceClassification 
-from data import *
-from utils import clean_text, unsimple_major, jsondump
-special_tokens_dict = {
-    'additional_special_tokens': ['&name&', '&affiliation&', '&social-security-num&', '&tel-num&', '&card-num&', '&bank-account&', '&num&', '&online-account&']
-    }
-
-def test(opt, device):
-
-    print(opt.bert_base_model)
-    print(opt.bart_base_model)
-    bert_tokenizer = AutoTokenizer.from_pretrained(opt.bert_base_model)
-    bart_tokenizer = AutoTokenizer.from_pretrained(opt.bart_base_model)
-    bert_tokenizer.add_special_tokens(special_tokens_dict)
-    bart_tokenizer.add_special_tokens(special_tokens_dict)
-    bert_dev_dataloader = create_bert_dataloader(opt.dev_data, bert_tokenizer, opt, 'ACD')
-    bart_dev_dataloader = create_dataloader(opt.dev_data, bart_tokenizer, opt)
-
-    print('loading model')
-    ce4_model, ce7_model, pc_model = load_models(opt)
-    ce4_model.resize_token_embeddings(len(bert_tokenizer))
-    ce7_model.resize_token_embeddings(len(bart_tokenizer))
-    pc_model.resize_token_embeddings(len(bart_tokenizer))
-    ce4_model.to(device)
-    ce7_model.eval()
-    ce7_model.to(device)
-    pc_model.to(device)
-    pc_model.eval()
-    print('end loading')
-
-    for bert_batch, bart_batch in zip(bert_dev_dataloader, bart_dev_dataloader):
-        bert_inputs = get_inputs_dict(bert_batch, bert_tokenizer, device)
-        bart_inputs = get_inputs_dict(bart_batch, bart_tokenizer, device)
-        
-        with torch.no_grad():
-            _, ce4_logits = ce4_model(**bert_inputs)
-        print(ce4_logits)
-        major_prediction = major_id_to_name[torch.argmax(ce4_logits, dim = -1)]
-        print(major_prediction)
-        with torch.no_grad():
-            _, ce7_logits = ce7_model(bart_inputs['input_ids'], bart_inputs['attention_mask'], major_prediction)
-        minor_prediction = minor_id_to_name[torch.argmax(ce7_logits, dim = -1)]
-
-        with torch.no_grad():
-            _, pc_logits = pc_model(bart_inputs['input_ids'], bart_inputs['input_mask'], minor_prediction)
-        pc_prediction = polarity_id_to_name[torch.argmax(pc_logits, dim = -1)]
-        print(pc_prediction)
-        # with torch.no_grad():
-        #     _, ce4_logits = ce4_model(input_ids, attention_mask)
-
-    # now = datetime.now()
-    # current_day = now.strftime('%m%d')
-
-    # jsondump(pred_data, opt.output_dir + opt.base_model +'_'+ current_day + '.json')
-    # print(opt.output_dir + opt.base_model +'_'+ current_day + '.json')
+from utils import clean_text, unsimple_major, jsondump, jsonlload
+from dictionaries import special_tokens_dict, major_id_to_name, minor_id_to_name, polarity_id_to_name, polarity_ko_to_en
 
 def load_models(opt, bert_tokenizer_len, bart_tokenizer_len):
     model4 = BertForSequenceClassification.from_pretrained(opt.bert_base_model, num_labels=4)
@@ -92,10 +40,6 @@ def inference(opt, device):
     data = jsonlload(opt.dev_data)
     for line in data:
         sentence = line['sentence_form']
-        # sentence['annotation'] = []
-        # if type(sentence) != str:
-        #     print("form type is arong: ", sentence)
-        #     continue
         sentence = clean_text(sentence)
 
         bert_tokenized_data = bert_tokenizer(['<CLS>'+sentence+'<SEP>'], padding='max_length', max_length=256, truncation=True)
@@ -143,7 +87,7 @@ def inference(opt, device):
         # data.append([sentence, major_name_to_id[major]])
         
 
-        line['annotation'].append([unsimple_major(major_prediction)+'#'+minor_prediction, pc_prediction])
+        line['annotation'].append([unsimple_major(major_prediction)+'#'+minor_prediction, polarity_ko_to_en[pc_prediction]])
     # print(f'accuracy : {hit/count} ma {majorhit/count} mi {minorhit/count} pc {pchit/count}')
     jsondump(data, 'output.json')
     return data

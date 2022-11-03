@@ -1,6 +1,6 @@
 import json
 import re
-from responses import target
+from dictionaries import polarity_en_to_ko
 
 def jsonload(fname, encoding="utf-8"):
     with open(fname, encoding=encoding) as f:
@@ -8,8 +8,12 @@ def jsonload(fname, encoding="utf-8"):
     return j
 # json 개체를 파일이름으로 깔끔하게 저장
 def jsondump(j, fname):
-    with open(fname, "w", encoding="UTF8") as f:
-        json.dump(j, f, ensure_ascii=False)
+    # with open(fname, "w", encoding="UTF8") as f:
+    with open(fname, "w", encoding="utf-8") as f:
+        for jsondict in j:
+            json.dump(jsondict, f, ensure_ascii=False)
+            f.write(',\n')
+        # json.dump(j, f, ensure_ascii=False)
 # jsonl 파일 읽어서 list에 저장
 def jsonlload(fname, encoding="utf-8"):
     json_list = []
@@ -17,6 +21,8 @@ def jsonlload(fname, encoding="utf-8"):
         for line in f.readlines():
             json_list.append(json.loads(line))
     return json_list
+
+    
 def simple_major(major):
     if major== '제품 전체':
         return '제품'
@@ -32,11 +38,6 @@ def unsimple_major(major):
 def clean_text(text):
     return re.compile('[^ 0-9A-Za-z가-힣]').sub('',text).strip()
 
-polarity_en_to_ko ={
-    'positive' : '긍정적',
-    'negative' : '부정적',
-    'neutral' : '중립적'
-}
 def ACDACD_template(major_category, minor_category):
     return major_category+ '의 '+ minor_category + ' 항목이다.'
 def ASCA_template(minor_category, polarity):
@@ -52,6 +53,7 @@ def reverse_ACDACD(sentence):
     return sentence.split()[-2]
 def reverse_ASCA(sentence):
     return sentence.split()[-1][:3]
+
 
 def make_json(src_path, target_path, task, valid=False):
     raw_data = jsonlload(src_path)
@@ -69,7 +71,6 @@ def make_json(src_path, target_path, task, valid=False):
                 write_buffer.append(sentence + '\001' + major + '\001' + minor)
             elif task == 'ACSA':
                 write_buffer.append(sentence + '\001' + minor + '\001' + polarity)
-
     with open(target_path, 'w', encoding='utf8') as f:
         for line in write_buffer:
             f.write(line+'\n')

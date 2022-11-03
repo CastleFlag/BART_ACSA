@@ -1,32 +1,15 @@
-# from models import Seq2SeqModel
-# model = Seq2SeqModel()
-# print(model)
-# ARTICLE_TO_SUMMARIZE = (
-#     "PG&E stated it scheduled the blackouts in response to forecasts for high winds "
-#     "amid dry conditions. The aim is to reduce the risk of wildfires. Nearly 800 thousand customers were "
-#     "scheduled to be affected by the shutoffs which were expected to last through at least midday tomorrow."
-# )
-# input_ids = model.encoder_tokenizer(ARTICLE_TO_SUMMARIZE, return_tensors="pt").input_ids
-
-# # autoregressively generate summary (uses greedy decoding by default)
-# generated_ids = model.generate(input_ids)
-# generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-# print(generated_text)
 import argparse
-from transformers import AutoModel, AutoTokenizer, BartForSequenceClassification
-from transformers import AdamW
-from transformers import get_linear_schedule_with_warmup
-from data import *
-from models import BartForConditionalGeneration
-from evalutation import evaluation, predict_val
-from tqdm import tqdm
-from shutil import copyfile
+import torch
 import os
+from tqdm import tqdm
+from transformers import AutoModel, AutoTokenizer, BartForSequenceClassification, AdamW, get_linear_schedul_with_warmup
+from models import BartForConditionalGeneration
 from sklearn.model_selection import train_test_split
+from data import get_inputs_dict, create_dataloader
+from evalutation import evaluation, predict_val
+from dictionaries import special_tokens_dict
 
-special_tokens_dict = {
-'additional_special_tokens': ['&name&', '&affiliation&', '&social-security-num&', '&tel-num&', '&card-num&', '&bank-account&', '&num&', '&online-account&']
-}
+
 def train(opt, device):
     entity_model_path = opt.entity_model_path +  str(opt.num_labels) + '/'
     best_model_path = '../saved_model/best_model/'
@@ -45,7 +28,7 @@ def train(opt, device):
 
     print('loading model')
     model = BartForSequenceClassification.from_pretrained(opt.base_model, num_labels=opt.num_labels)
-    # model = BartForSequenceClassification.from_pretrained("valhalla/bart-large-sst2", problem_type="multi_label_classification")
+    # model = BartForSequenceClassification.from_pretrained(opt.base_model, problem_type="multi_label_classification")
     model.resize_token_embeddings(len(tokenizer))
     model.to(device)
     print('end loading')
